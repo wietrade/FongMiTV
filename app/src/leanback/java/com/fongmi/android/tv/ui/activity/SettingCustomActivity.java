@@ -6,6 +6,7 @@ import android.view.View;
 
 import androidx.viewbinding.ViewBinding;
 
+import com.fongmi.android.tv.App;
 import com.fongmi.android.tv.R;
 import com.fongmi.android.tv.Setting;
 import com.fongmi.android.tv.databinding.ActivitySettingCustomBinding;
@@ -13,9 +14,11 @@ import com.fongmi.android.tv.event.RefreshEvent;
 import com.fongmi.android.tv.ui.base.BaseActivity;
 import com.fongmi.android.tv.ui.dialog.ButtonsDialog;
 import com.fongmi.android.tv.ui.dialog.DisplayDialog;
+import com.fongmi.android.tv.ui.dialog.LanguageDialog;
 import com.fongmi.android.tv.ui.dialog.MenuKeyDialog;
+import com.fongmi.android.tv.ui.dialog.X5WebViewDialog;
 import com.fongmi.android.tv.utils.ResUtil;
-
+import com.tencent.smtt.sdk.QbSdk;
 import java.util.Locale;
 
 public class SettingCustomActivity extends BaseActivity {
@@ -27,6 +30,7 @@ public class SettingCustomActivity extends BaseActivity {
     private String[] fullscreenMenuKey;
     private String[] smallWindowBackKey;
     private String[] homeUI;
+    private String[] parseWebview;
 
     @Override
     protected ViewBinding getBinding() {
@@ -56,6 +60,8 @@ public class SettingCustomActivity extends BaseActivity {
         mBinding.aggregatedSearchText.setText(getSwitch(Setting.isAggregatedSearch()));
         mBinding.homeUIText.setText((homeUI = ResUtil.getStringArray(R.array.select_home_ui))[Setting.getHomeUI()]);
         mBinding.homeHistoryText.setText(getSwitch(Setting.isHomeHistory()));
+        mBinding.languageText.setText((ResUtil.getStringArray(R.array.select_language))[Setting.getLanguage()]);
+        mBinding.parseWebviewText.setText((parseWebview = ResUtil.getStringArray(R.array.select_parse_webview))[Setting.getParseWebView()]);
     }
 
     @Override
@@ -75,6 +81,9 @@ public class SettingCustomActivity extends BaseActivity {
         mBinding.homeUI.setOnClickListener(this::setHomeUI);
         mBinding.homeButtons.setOnClickListener(this::onHomeButtons);
         mBinding.homeHistory.setOnClickListener(this::setHomeHistory);
+        mBinding.setLanguage.setOnClickListener(this::setLanguage);
+        mBinding.parseWebview.setOnClickListener(this::setParseWebview);
+
     }
 
     private void setQuality(View view) {
@@ -167,6 +176,22 @@ public class SettingCustomActivity extends BaseActivity {
     private void setHomeHistory(View view) {
         Setting.putHomeHistory(!Setting.isHomeHistory());
         mBinding.homeHistoryText.setText(getSwitch(Setting.isHomeHistory()));
+    }
+
+    private void setLanguage(View view) {
+        LanguageDialog.create(this).show();
+    }
+
+    public void setLanguageText() {
+        mBinding.languageText.setText((ResUtil.getStringArray(R.array.select_language))[Setting.getLanguage()]);
+    }
+
+
+    private void setParseWebview(View view) {
+        int index = Setting.getParseWebView();
+        Setting.putParseWebView(index = index == parseWebview.length - 1 ? 0 : ++index);
+        mBinding.parseWebviewText.setText(parseWebview[index]);
+        if (index == 1 && QbSdk.getTbsVersion(App.get()) <= 0) X5WebViewDialog.create(this).show();
     }
 
 }
