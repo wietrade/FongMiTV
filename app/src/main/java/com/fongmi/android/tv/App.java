@@ -41,7 +41,7 @@ public class App extends Application {
 
     public App() {
         instance = this;
-        executor = Executors.newFixedThreadPool(Constant.THREAD_POOL * 2);
+        executor = Executors.newFixedThreadPool(Constant.THREAD_POOL);
         handler = HandlerCompat.createAsync(Looper.getMainLooper());
         gson = new Gson();
     }
@@ -85,7 +85,6 @@ public class App extends Application {
 
     private void setActivity(Activity activity) {
         this.activity = activity;
-        LanguageUtil.setLanguage(getResources(), Setting.getLanguage());
     }
 
     private LogAdapter getLogAdapter() {
@@ -107,6 +106,7 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
         Notify.createChannel();
+        LanguageUtil.init(this);
         Logger.addLogAdapter(getLogAdapter());
         OkHttp.get().setProxy(Setting.getProxy());
         OkHttp.get().setDoh(Doh.objectFrom(Setting.getDoh()));

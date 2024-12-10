@@ -47,7 +47,6 @@ import com.fongmi.android.tv.event.RefreshEvent;
 import com.fongmi.android.tv.event.ServerEvent;
 import com.fongmi.android.tv.impl.Callback;
 import com.fongmi.android.tv.impl.ConfigCallback;
-import com.fongmi.android.tv.impl.RestoreCallback;
 import com.fongmi.android.tv.model.SiteViewModel;
 import com.fongmi.android.tv.player.Source;
 import com.fongmi.android.tv.server.Server;
@@ -55,7 +54,6 @@ import com.fongmi.android.tv.ui.base.BaseActivity;
 import com.fongmi.android.tv.ui.custom.CustomTitleView;
 import com.fongmi.android.tv.ui.dialog.HistoryDialog;
 import com.fongmi.android.tv.ui.dialog.MenuDialog;
-import com.fongmi.android.tv.ui.dialog.RestoreDialog;
 import com.fongmi.android.tv.ui.dialog.SiteDialog;
 import com.fongmi.android.tv.ui.fragment.HomeFragment;
 import com.fongmi.android.tv.ui.fragment.VodFragment;
@@ -79,7 +77,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class HomeActivity extends BaseActivity implements CustomTitleView.Listener, RestoreCallback,  TypePresenter.OnClickListener, ConfigCallback {
+public class HomeActivity extends BaseActivity implements CustomTitleView.Listener, TypePresenter.OnClickListener, ConfigCallback {
 
     public ActivityHomeBinding mBinding;
     private ArrayObjectAdapter mAdapter;
@@ -111,7 +109,7 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     @Override
     protected void initView() {
         DLNARendererService.Companion.start(this, R.drawable.ic_logo);
-        mClock = Clock.create(mBinding.time).format("MM/dd HH:mm:ss");
+        mClock = Clock.create(mBinding.clock).format("MM/dd HH:mm:ss");
         Updater.get().release().start(this);
         Server.get().start();
         Tbs.init();
@@ -156,10 +154,10 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         mBinding.homeSiteLock.setVisibility(Setting.isHomeSiteLock() ? View.VISIBLE : View.GONE);
         if (Setting.getHomeUI() == 0) {
             mBinding.title.setTextSize(24);
-            mBinding.time.setTextSize(24);
+            mBinding.clock.setTextSize(24);
         } else {
             mBinding.title.setTextSize(20);
-            mBinding.time.setTextSize(20);
+            mBinding.clock.setTextSize(20);
         }
     }
 
@@ -322,6 +320,11 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     private Callback getCallback(String success) {
         return new Callback() {
             @Override
+            public void success(String result) {
+                Notify.show(result);
+            }
+
+            @Override
             public void success() {
                 checkAction(getIntent());
                 RefreshEvent.video();
@@ -331,24 +334,13 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
 
             @Override
             public void error(String msg) {
-                if (TextUtils.isEmpty(msg) && AppDatabase.getBackup().exists()) RestoreDialog.create(getActivity()).show();
-                getHomeFragment().mBinding.progressLayout.showContent();
+                if (getHomeFragment().inited) getHomeFragment().mBinding.progressLayout.showContent();
+                else App.post(() -> getHomeFragment().mBinding.progressLayout.showContent(), 1000);
                 mResult = Result.empty();
                 Notify.show(msg);
-                setFocus();
+                setLoading(false);
             }
         };
-    }
-
-    @Override
-    public void onRestore() {
-        PermissionX.init(this).permissions(Manifest.permission.WRITE_EXTERNAL_STORAGE).request((allGranted, grantedList, deniedList) -> AppDatabase.restore(new Callback() {
-            @Override
-            public void success() {
-                if (allGranted) getHomeFragment().mBinding.progressLayout.showProgress();
-                if (allGranted) initConfig();
-            }
-        }));
     }
 
     private void load(Config config, String success) {
@@ -391,7 +383,8 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
         FileUtil.clearCache(new Callback() {
             @Override
             public void success() {
-                setConfig(VodConfig.get().getConfig().json("").save(), ResUtil.getString(R.string.config_refreshed));
+                Config config = VodConfig.get().getConfig().json("").save();
+                if (!config.isEmpty()) setConfig(config, ResUtil.getString(R.string.config_refreshed));
             }
         });
     }
@@ -483,11 +476,11 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     }
 
     private void setLogo() {
-        Glide.with(this).load(VodConfig.get().getConfig().getLogo()).circleCrop().override(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL).listener(getListener()).into(mBinding.logo);
+        Glide.with(App.get()).load(UrlUtil.convert(VodConfig.get().getConfig().getLogo())).circleCrop().override(Target.SIZE_ORIGINAL, Target.SIZE_ORIGINAL).listener(getListener()).into(mBinding.logo);
     }
 
     private RequestListener<Drawable> getListener() {
-        return new RequestListener<>() {
+        return new RequestListener<Drawable>() {
             @Override
             public boolean onLoadFailed(@Nullable GlideException e, Object model, @NonNull Target<Drawable> target, boolean isFirstResource) {
                 mBinding.logo.setVisibility(View.GONE);
@@ -553,9 +546,9 @@ public class HomeActivity extends BaseActivity implements CustomTitleView.Listen
     protected void onBackPress() {
         if (isVisible(mBinding.recycler) && mBinding.recycler.getSelectedPosition() != 0) {
             mBinding.recycler.scrollToPosition(0);
-        } else if (mPageAdapter != null && getHomeFragment().init && getHomeFragment().mBinding.progressLayout.isProgress()) {
+        } else if (mPageAdapter != null && getHomeFragment().inited && getHomeFragment().mBinding.progressLayout.isProgress()) {
             getHomeFragment().mBinding.progressLayout.showContent();
-        } else if (mPageAdapter != null && getHomeFragment().init && getHomeFragment().mPresenter != null && getHomeFragment().mPresenter.isDelete()) {
+        } else if (mPageAdapter != null && getHomeFragment().inited && getHomeFragment().mPresenter != null && getHomeFragment().mPresenter.isDelete()) {
             getHomeFragment().setHistoryDelete(false);
         } else if (getHomeFragment().canBack()) {
             getHomeFragment().goBack();
